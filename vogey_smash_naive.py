@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Jun  1 18:19:07 2019
-
+Sean Boyd did this shit
+Give him some credit, please...but not much credit!
 @author: seanp
 """
 import math
