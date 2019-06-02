@@ -15,12 +15,16 @@ C_drag   = 0.4     #          coefficient of drag
 C_lift   = 0.30    #          coefficient of lift (Magnus force)
 rho      = 1.23    #kg/m^3  - assumed density of air at sea level
 A        = 0.00426 #m^2     - cross sectional area of baseball
+r        = A/(2*math.pi)
+romega   = 32.1
+tau      = 25.0
+
 m        = 0.145   #kg      - mass of baseball
 g        = 9.8     #m/s^2   - acceleration of gravity
 dt       = 0.01    #seconds - increment of time used in RK
-kappa    = 0.5 * C_drag * rho * A / m
+
                    #coefficient used to scale abs(v)v for drag computation
-mu       = 0.5 * C_lift * rho * A / m
+
                     #coefficient used for lift in Magnus force
 startx   = 0.0
 starty   = 2.0/3.0
@@ -85,28 +89,40 @@ def direction(rk_vec):
     return np.array([0.0, 0.0, rk_vec[2] / s, rk_vec[3] / s])
                    
 #this is as in the first order ODE y' = f(t, y)
-def f(rk_vec):
+def f(t, rk_vec):
+    kappa    = 0.5 * c_d(S(t, speed(rk_vec))) * rho * A / m
     c = -kappa * speed(rk_vec)
     return np.array([rk_vec[2], rk_vec[3], c * rk_vec[2], c * rk_vec[3] - g])
 
-def f2(rk_vec):
-    c = -kappa * speed(rk_vec)
-    d = mu * speed(rk_vec)
+def f2(t, rk_vec):
+    kappa    = 0.5 * c_d(S(t, m2f(speed(rk_vec)))) * rho * A / m
+    c        = -kappa * speed(rk_vec)
+    mu       = 0.5 * c_l(S(t, m2f(speed(rk_vec)))) * rho * A / m    
+    d        = mu * speed(rk_vec)
     return np.array([rk_vec[2], rk_vec[3], c * rk_vec[2] - d * rk_vec[3], c * rk_vec[3] + d * rk_vec[2] - g])
 
+def S(t, v):
+    return romega/v * math.exp(-v*t/(146.7*tau))
 
+def c_d(s):
+    return 0.385*(1.0 + 0.2017 * s**2)
+
+def c_l(s):
+    return s/(2.32*s + 0.4)
+    
 def rungekutta_with_cond(start_pt, start_t, h, fn, cutoff_x):
     cur_pt = start_pt
     cur_t  = start_t
     datalist = [cur_pt]
     while cur_pt[0] < cutoff_x:
-        k1 = h * fn(cur_pt)
-        k2 = h * fn(cur_pt + 0.5 * k1)
-        k3 = h * fn(cur_pt + 0.5 * k2)
-        k4 = h * fn(cur_pt + k3)
-        cur_t = cur_t + h
+        k1 = h * fn(cur_t,       cur_pt)
+        k2 = h * fn(cur_t + h/2, cur_pt + 0.5 * k1)
+        k3 = h * fn(cur_t + h/2, cur_pt + 0.5 * k2)
+        k4 = h * fn(cur_t + h,   cur_pt + k3)
+        
         cur_pt = cur_pt + (k1 + 2 * k2 + 2 * k3 + k4)/6
         datalist.append(cur_pt)
+        cur_t = cur_t + h
     return datalist
 
 
@@ -155,7 +171,7 @@ if __name__ == "__main__":
     #r = rungekutta_with_cond(x, 0, dt, f, targetx)
     #print(vec_m2f(r[1][-1]))
     
-    launch_angle = [20 + i for i in range(0,15)]
+    launch_angle = [20 + i for i in range(0,20)]
     
     print("Begin, using Magnus force computation")
     ploty2 = es_to_langle(f2, dt, targetx, launch_angle)
@@ -164,10 +180,13 @@ if __name__ == "__main__":
     mp.ylabel("Exit velocity (mph)")
     mp.show()
     
-    launch_angle = 29
-    v            = mph_to_mps(114)
+    print(ploty2)
+    val, idx = min((val, idx) for (idx, val) in enumerate(ploty2))
     
-    u    = np.array([startx, starty, v * math.cos(dtr(launch_angle)), v * math.sin(dtr(launch_angle))])
+    l = launch_angle[idx]
+    v = mph_to_mps(ploty2[idx])
+    print(l, v)
+    u    = np.array([startx, starty, v * math.cos(dtr(l)), v * math.sin(dtr(l))])
     rval = rungekutta_with_cond(u, 0, dt, f2, f2m(600))
     
     x = []
