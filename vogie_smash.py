@@ -15,7 +15,7 @@ C_drag   = 0.4     #          coefficient of drag
 C_lift   = 0.30    #          coefficient of lift (Magnus force)
 rho      = 1.23    #kg/m^3  - assumed density of air at sea level
 A        = 0.00426 #m^2     - cross sectional area of baseball
-r        = A/(2*math.pi)
+r        = A/(2*math.pi) #radius of baseball
 romega   = 32.1
 tau      = 25.0
 
@@ -95,21 +95,27 @@ def f(t, rk_vec):
     return np.array([rk_vec[2], rk_vec[3], c * rk_vec[2], c * rk_vec[3] - g])
 
 def f2(t, rk_vec):
-    kappa    = 0.5 * c_d(S(t, m2f(speed(rk_vec)))) * rho * A / m
-    c        = -kappa * speed(rk_vec)
-    mu       = 0.5 * c_l(S(t, m2f(speed(rk_vec)))) * rho * A / m    
-    d        = mu * speed(rk_vec)
+    sp       = speed(rk_vec)
+    kappa    = 0.5 * c_d(S(t, m2f(sp))) * rho * A / m
+    c        = -kappa * sp
+    mu       = 0.5 * c_l(S(t, m2f(sp))) * rho * A / m    
+    d        = mu * sp
     return np.array([rk_vec[2], rk_vec[3], c * rk_vec[2] - d * rk_vec[3], c * rk_vec[3] + d * rk_vec[2] - g])
 
 def S(t, v):
     return romega/v * math.exp(-v*t/(146.7*tau))
 
+#computes the drag coefficient, given the spin ratio
 def c_d(s):
     return 0.385*(1.0 + 0.2017 * s**2)
 
 def c_l(s):
     return s/(2.32*s + 0.4)
-    
+
+#this is a quick and dirty implementation of the standard 4th order
+#explicit Runge-Kutta with a twist; we proceed until a specified condition on 
+#the first coordinate of x is achieved
+#this corresponds to seeing how high the baseball is at 375 feet from home plate
 def rungekutta_with_cond(start_pt, start_t, h, fn, cutoff_x):
     cur_pt = start_pt
     cur_t  = start_t
@@ -125,7 +131,7 @@ def rungekutta_with_cond(start_pt, start_t, h, fn, cutoff_x):
         cur_t = cur_t + h
     return datalist
 
-
+#compute the points for the graph of the relation between exit velocity and launch angle
 def es_to_langle(fn, dt, tx, larray):
     ploty        = []
     for l in larray:
@@ -141,6 +147,8 @@ def es_to_langle(fn, dt, tx, larray):
             rval  = rungekutta_with_cond(x, 0, dt, fn, tx)
             y     = rval[-1][1]
 
+        #we've found our initial bracket - now we use bisection method to narrow down on velocity
+        #needed to hit the target
         if y > 0:
             v_lo = v_cur
             v_hi = v_cur + 5
@@ -154,12 +162,12 @@ def es_to_langle(fn, dt, tx, larray):
                     v_lo = v_cur
                 else:
                     v_hi = v_cur
+
             ploty.append(mps_to_mph(v_cur))
-            
+
         else:
             ploty.append(0)
-            
-        
+
     return ploty
 
 
